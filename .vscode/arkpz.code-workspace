@@ -1,0 +1,38 @@
+{
+  "folders": [
+    {
+      "name": "Global",
+      "path": "../"
+    },
+    {
+      "name": "Task 2",
+      "path": "../Task2/arkpz-pzpi-22-1-dzhezhela-nikita-task2"
+    },
+    {
+      "name": "Task 3",
+      "path": "../Task3/arkpz-pzpi-22-1-dzhezhela-nikita-task3"
+    },
+    {
+      "name": "Task 4",
+      "path": "../Task4/arkpz-pzpi-22-1-dzhezhela-nikita-task4"
+    },
+    {
+      "name": "Task 5",
+      "path": "../Task5/arkpz-pzpi-22-1-dzhezhela-nikita-task5"
+    }
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "eslint.workingDirectories": [
+      {
+        "mode": "auto"
+      }
+    ],
+    "files.exclude": {
+      "node_modules/": true,
+      ".turbo/": true,
+      "dist/": true
+    }
+  }
+}
