@@ -33,6 +33,9 @@
       "node_modules/": true,
       ".turbo/": true,
       "dist/": true
+    },
+    "[dotenv]": {
+      "editor.defaultFormatter": "foxundermoon.shell-format"
     }
   }
 }
