@@ -1,0 +1,318 @@
+Харківський університет радіоелектроніки
+Факультет комп'ютерних наук
+Кафедра програмної інженерії
+
+
+
+
+
+
+
+
+
+
+ЗВІТ
+до лабораторного заняття з дисципліни
+"Аналіз та рефакторинг коду"
+на тему "Розробка IoT клієнта"
+
+
+
+
+
+
+
+
+Виконав ст. гр ПЗПІ-22-1
+Джежела Нікіта Русланович
+
+
+Перевірив
+ст. викладач кафедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+
+
+
+
+
+
+Харків 2024
+1 МЕТА
+Розробити програмне забезпечення для  IoT або SmartDevice пристрою, створеного на базі будь-якої поширеної на  сьогодні платформи, придатної для реалізації вбудованих систем (Embedded  System). 
+2 ЗАВДАННЯ
+1. Розробити будову програмного забезпечення IoT клієнта.
+2. Створити UML діаграму прецедентів для IoT клієнта.
+3. Розробити бізнес-логіку (математичну обробку повʼязаних із предметною областю даних) та функції налаштування IoT клієнта.
+4. Створити діаграму діяльності для IoT клієнта.
+5. Створити програмну реалізацію бізнес-логіки та функцій налаштування IoT клієнта.
+6. Перевірити роботу IoT клієнта.
+3 ХІД РОБОТИ
+IoT девайс складається з наступних частин: 
+1. Головний мікроконтролер для виконання математичних операцій, обробки даних, підтримки комунікацій між сенсорами
+2. GPS Датчик, який може бути вбудованим у платформу.
+3. WIFI або GSM модуль, який може бути окремим або вбудованим у платформу (під час виконання лабораторної роботи буде використано сервіс Wokwi з підтримкою емуляції Wi-Fi мережі).
+Виходячи з цієї специфікації, необхідно розробити наступні модулі ПЗ:
+1. Модуль комунікації з системами автомобіля.
+У сучасних автомобілів дуже багато систем, яким необхідно комунікувати між собою. Для цього за стандартом використовується CAN шина, по якій відбувається обмін даними між електронними блоками управління. Відповідно, для отримання даних та управління цими системами, нам необхідно під’єднатись до CAN шини та отримати з неї дані. Для цього необхідно відправити команду та прослухати відповідь. Проблема в тому, що у кожного автомобіля, список команд, адреса блоків та інші змінні різні, отже необхідно конфігурувати цей модуль відповідно до марки, моделі, та ревізії внутрішньої системи.
+2. Модуль обробки даних с GPS датчиків.
+3. Модуль зв’язку з сервером за допомогою протоколу WebSocket.
+4. Модуль конфігурації пристрою.
+Діаграму прецедентів для базової логіки IoT клієнта наведено на рисунку 1.
+  
+
+Рисунок 1 – UML Діаграма прецедентів
+Діаграму діяльності IoT клієнта наведено на рисунку 1.
+  
+
+Рисунок 2 – UML Діаграма діяльності
+Для створення та перевірки IoT клієнта скористаємось сервісом Wokwi.
+________________
+ВИСНОВКИ
+Розробив бізнес-логіку та функції адміністрування серверної частини  програмної системи.
+Посилання на YouTube відео: https://youtu.be/UpS_WiGDZuA
+
+
+________________
+
+
+ДОДАТОК А
+Частини програмного коду застосунку
+1. Модуль обробки GPS
+#include "gps.h"
+
+
+IoTGPS::IoTGPS(HardwareSerial* serial, int updateInterval)
+  : serial(serial), updateInterval(updateInterval) {
+  state = State::getInstance();
+  lastUpdate = 0;
+  lastLatitude = 0;
+  lastLongitude = 0;
+  lastSpeed = 0;
+  lastFixAge = TinyGPS::GPS_INVALID_AGE;
+}
+
+
+void IoTGPS::begin(unsigned long baud) {
+  serial->begin(baud);
+}
+
+
+void IoTGPS::loop() {
+  bool isUpdated = false;
+
+
+  // Process all available characters
+  while (serial->available()) {
+    int c = serial->read();
+    if (gps.encode(c)) {
+      isUpdated = true;
+    }
+  }
+
+
+
+
+  if (isUpdated && (millis() - lastUpdate >= updateInterval)) {
+    float lat, lon;
+    unsigned long age;
+
+
+    gps.f_get_position(&lat, &lon, &age);
+
+
+    if (age != TinyGPS::GPS_INVALID_AGE) {
+      lastLatitude = lat;
+      lastLongitude = lon;
+      lastFixAge = age;
+
+
+      float speed = gps.f_speed_kmph();
+      if (speed != TinyGPS::GPS_INVALID_F_SPEED) {
+        lastSpeed = speed;
+      }
+
+
+      // Update global state
+      state->setLatitude(lastLatitude);
+      state->setLongitude(lastLongitude);
+      state->setSpeed(lastSpeed);
+    }
+
+
+    lastUpdate = millis();
+  }
+}
+2. Модуль обробки Web Socket з’єднання
+IoTNetwork::IoTNetwork(Config *config) : config(config)
+{
+    isConnected = false;
+    lastReconnectAttempt = 0;
+    state = State::getInstance();
+}
+
+
+bool IoTNetwork::connectToWiFi()
+{
+    Serial.println("Connecting to WiFi...");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(config->getSSID().c_str(), config->getPassword().c_str());
+
+
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20)
+    {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+    }
+
+
+    if (WiFi.status() == WL_CONNECTED)
+    {
+        Serial.println("\nWiFi connected");
+        return true;
+    }
+
+
+    Serial.println("\nWiFi connection failed");
+    return false;
+}
+
+
+void IoTNetwork::setupWebSocket()
+{
+    String wsUrl = config->getWsUrl();
+
+
+    webSocket.setCACert(ssl_cert);
+
+
+    webSocket.onMessage([&](websockets::WebsocketsMessage msg)
+                        {
+    Serial.print("Got Message: ");
+    Serial.println(msg.data()); });
+
+
+    webSocket.onEvent([&](websockets::WebsocketsEvent event, String data)
+                      {
+    if (event == websockets::WebsocketsEvent::ConnectionOpened) {
+      Serial.println("WebSocket connection opened");
+      isConnected = true;
+    } else if (event == websockets::WebsocketsEvent::ConnectionClosed) {
+      Serial.println("WebSocket connection closed");
+      isConnected = false;
+    } });
+
+
+    Serial.print("Connecting to WS: ");
+    Serial.println(wsUrl);
+
+
+    bool connected = webSocket.connect(wsUrl);
+
+
+    if (connected)
+    {
+        Serial.println("WebSocket connected!");
+        isConnected = true;
+    }
+    else
+    {
+        Serial.println("WebSocket connection failed!");
+        isConnected = false;
+    }
+}
+
+
+bool IoTNetwork::connect()
+{
+    if (!connectToWiFi())
+    {
+        return false;
+    }
+
+
+    setupWebSocket();
+    return isConnected;
+}
+
+
+void IoTNetwork::loop()
+{
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        unsigned long currentMillis = millis();
+        if (currentMillis - lastReconnectAttempt >= config->getReconnectionRetryDelay())
+        {
+            lastReconnectAttempt = currentMillis;
+            Serial.println("WiFi disconnected. Attempting to reconnect...");
+            connectToWiFi();
+        }
+    }
+
+
+    if (isConnected)
+    {
+        webSocket.poll();
+    }
+    else
+    {
+        unsigned long currentMillis = millis();
+        if (currentMillis - lastReconnectAttempt >= config->getReconnectionRetryDelay())
+        {
+            lastReconnectAttempt = currentMillis;
+            Serial.println("Attempting to reconnect WebSocket...");
+            setupWebSocket();
+        }
+    }
+}
+
+
+String IoTNetwork::preparePackage(MessageType type, String &payload)
+{
+    StaticJsonDocument<1024> doc;
+
+
+    doc["token"] = config->getAuthToken();
+
+
+    switch (type)
+    {
+    case MessageType::VEHICLE_STATUS:
+        doc["type"] = "VEHICLE_STATUS";
+        break;
+    case MessageType::SET_VEHICLE_STATUS:
+        doc["type"] = "SET_VEHICLE_STATUS";
+        break;
+    case MessageType::CAR_INTERNAL:
+        doc["type"] = "CAR_INTERNAL";
+        break;
+    }
+
+
+    StaticJsonDocument<512> payloadDoc;
+    deserializeJson(payloadDoc, payload);
+    doc["payload"] = payloadDoc;
+
+
+    String output;
+    serializeJson(doc, output);
+    return output;
+}
+
+
+bool IoTNetwork::send(String &message)
+{
+    if (!isConnected)
+    {
+        Serial.println("Cannot send message: WebSocket not connected");
+        return false;
+    }
+
+
+    return webSocket.send(message);
+}
