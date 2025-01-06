@@ -1,0 +1,26 @@
+{
+  "name": "@repo/supabase",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "supabase": "^2.1.1",
+    "typescript": "5.5.4"
+  },
+  "scripts": {
+    "start": "supabase start",
+    "stop": "supabase stop",
+    "dev": "supabase functions dev",
+    "deploy": "supabase functions deploy"
+  },
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.10"
+  }
+}

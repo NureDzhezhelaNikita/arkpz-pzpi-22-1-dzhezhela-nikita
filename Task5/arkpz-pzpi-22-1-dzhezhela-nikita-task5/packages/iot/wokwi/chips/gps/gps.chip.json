@@ -1,0 +1,6 @@
+{
+  "name": "gps",
+  "author": "Нікіта Джежела",
+  "pins": ["RX", "TX", "GND", "VCC"],
+  "controls": []
+}
