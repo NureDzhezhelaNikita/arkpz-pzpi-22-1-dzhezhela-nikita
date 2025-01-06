@@ -72,7 +72,7 @@ Deno.serve(
           longitude: payload.longitude,
           status: payload.status,
           speed: payload.speed,
-          mileage: payload.mileage,
+          mileage: Math.round(payload.mileage),
         })
         .select("*")
         .single();
