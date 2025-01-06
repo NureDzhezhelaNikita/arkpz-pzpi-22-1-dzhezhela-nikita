@@ -36,6 +36,9 @@
     },
     "[dotenv]": {
       "editor.defaultFormatter": "foxundermoon.shell-format"
+    },
+    "[cpp]": {
+      "editor.defaultFormatter": "ms-vscode.cpptools"
     }
   }
 }

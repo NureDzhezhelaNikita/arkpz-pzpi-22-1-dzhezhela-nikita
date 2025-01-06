@@ -22,12 +22,13 @@ Deno.serve(
   withErrorHandler(async (req) => {
     const { socket, response } = Deno.upgradeWebSocket(req);
 
-    socket.onopen = () => {
-      console.log("WebSocket connection established");
+    socket.onopen = (event) => {
+      console.log("WebSocket connection established", event, req);
     };
 
     socket.onmessage = async (event) => {
       const message = JSON.parse(event.data);
+      console.log("WebSocket message received", message);
       const { token, type, payload } = message;
 
       if (!token) return;
@@ -81,8 +82,8 @@ Deno.serve(
       console.error("WebSocket error:", error);
     };
 
-    socket.onclose = () => {
-      console.log("WebSocket connection closed");
+    socket.onclose = (event) => {
+      console.log("WebSocket connection closed", event);
     };
 
     return response;
