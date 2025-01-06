@@ -1,0 +1,265 @@
+Харківський університет радіоелектроніки
+Факультет комп'ютерних наук
+Кафедра програмної інженерії
+
+
+
+
+
+
+
+
+
+
+ЗВІТ
+до лабораторного заняття з дисципліни
+"Аналіз та рефакторинг коду"
+на тему "Розробка бізнес-логіки та функцій адміністрування серверної частини програмної системи"
+
+
+
+
+
+
+
+
+Виконав ст. гр ПЗПІ-22-1
+Джежела Нікіта Русланович
+
+
+Перевірив
+ст. викладач кафедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+
+
+
+
+
+
+Харків 2024
+1 МЕТА
+Розробити бізнес-логіку та функції адміністрування серверної частини  програмної системи.
+2 ЗАВДАННЯ
+1. Розробити бізнес-логіку серверної частини програмної системи.
+2. Розробити функції адміністрування серверної частини програмної системи.
+3. Створити програмну реалізацію бізнес-логіки та функцій адміністрування серверної частини.
+3 ХІД РОБОТИ
+На UML діаграмі діяльності наведено основні прецеденти бізнес-логіки. 
+  
+
+Рисунок 1 – UML Діаграма діяльності
+На першій UML діаграмі діяльності  (рис. 2) наведено інформацію про основні частини взаємодії користувача, сервера та IoT пристрою.
+  
+
+Рисунок 2 – UML Діаграма взаємодії
+На другій UML діаграмі діяльності (рис. 3) наведено інформацію про ініціалізацію подорожі та обробки даних від IoT клієнта.
+  
+
+Рисунок 3 – UML Діаграма взаємодії
+Реалізуємо бізнес-логіку та функції адміністрування відповідно до визначеного API у попередній лабораторній роботі. Для цього використовуємо мову програмування JavaScript та Supabase SDK у якості ORM.
+Приклади функцій адміністрування та бізнес-логіки наведено у додатку А.
+________________
+
+
+ВИСНОВКИ
+Розробив бізнес-логіку та функції адміністрування серверної частини  програмної системи.
+Посилання на YouTube відео: https://youtu.be/6QX439o1ZAg
+
+
+________________
+
+
+ДОДАТОК А
+Частини програмного коду
+1.  Функція адміністрування користувачів.
+import { supabase } from "../_shared/client.ts";
+import { withCors } from "../_shared/cors.ts";
+
+
+Deno.serve(
+  withCors(async (req) => {
+    const headers = { "Content-Type": "application/json" };
+
+
+    switch (req.method) {
+      case "GET": {
+        const { data: users, error } = await supabase.from("users").select("*");
+
+
+        if (error) {
+          return new Response(JSON.stringify(error), { status: 500, headers });
+        }
+
+
+        return new Response(JSON.stringify(users), { headers });
+      }
+
+
+      case "POST": {
+        const body = await req.json();
+        const { data: user, error } = await supabase
+          .from("users")
+          .insert(body)
+          .select()
+          .single();
+
+
+        if (error) {
+          return new Response(JSON.stringify(error), { status: 500, headers });
+        }
+
+
+        return new Response(JSON.stringify(user), { status: 201, headers });
+      }
+
+
+      case "PUT": {
+        const body = await req.json();
+        const { id, ...updates } = body;
+
+
+        const { data: user, error } = await supabase
+          .from("users")
+          .update(updates)
+          .eq("id", id)
+          .select()
+          .single();
+
+
+        if (error) {
+          return new Response(JSON.stringify(error), { status: 500, headers });
+        }
+
+
+        return new Response(JSON.stringify(user), { headers });
+      }
+
+
+      case "DELETE": {
+        const { searchParams } = new URL(req.url);
+        const id = searchParams.get("id");
+
+
+        if (!id) {
+          return new Response(
+            JSON.stringify({ error: "Missing id parameter" }),
+            {
+              status: 400,
+              headers,
+            }
+          );
+        }
+
+
+        const { error } = await supabase.from("users").delete().eq("id", id);
+
+
+        if (error) {
+          return new Response(JSON.stringify(error), { status: 500, headers });
+        }
+
+
+        return new Response(null, { status: 204 });
+      }
+
+
+      default:
+        return new Response(JSON.stringify({ error: "Method not allowed" }), {
+          status: 405,
+          headers,
+        });
+    }
+  })
+);
+2.  Функція обробки даних від ІоТ пристрою та встановлення зв’язку.
+import { supabase } from "../_shared/client.ts";
+import { withErrorHandler } from "../_shared/error-handler.ts";
+
+
+Deno.serve(
+  withErrorHandler(async (req) => {
+    const { socket, response } = Deno.upgradeWebSocket(req);
+
+
+    socket.onopen = () => {
+      console.log("WebSocket connection established");
+    };
+
+
+    socket.onmessage = async (event) => {
+      const message = JSON.parse(event.data);
+      const { token, type, payload } = message;
+
+
+      if (!token) return;
+
+
+      const { data: vehicle, error } = await supabase
+        .from("vehicles")
+        .select("*")
+        .eq("auth_token", token)
+        .single();
+
+
+      if (error || !vehicle || vehicle.auth_token !== token) {
+        return socket.close();
+      }
+
+
+      if (type !== "VEHICLE_STATUS") return;
+
+
+      const tripIdFromIoT = payload.tripId;
+
+
+      const { data: activeTrip } = await supabase
+        .from("trips")
+        .select("*")
+        .eq("vehicle_id", vehicle.id)
+        .eq("status", "ACTIVE")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+
+      if (activeTrip && activeTrip.id !== tripIdFromIoT) {
+        return;
+      }
+
+
+      await supabase
+        .from("vehicle_statuses")
+        .insert({
+          vehicle_id: vehicle.id,
+          trip_id: activeTrip?.id || null,
+          is_locked: payload.isLocked,
+          is_started: payload.isStarted,
+          fuel: payload.fuel,
+          latitude: payload.latitude,
+          longitude: payload.longitude,
+          status: payload.status,
+          speed: payload.speed,
+          mileage: payload.mileage,
+        })
+        .select("*")
+        .single();
+    };
+
+
+    socket.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+
+    socket.onclose = () => {
+      console.log("WebSocket connection closed");
+    };
+
+
+    return response;
+  })
+);
